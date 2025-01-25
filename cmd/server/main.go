@@ -71,11 +71,11 @@ func main() {
 	// Bind to the port specified by the PORT environment variable
     port := os.Getenv("PORT")
     if port == "" {
-        port = "8080" // Default to 8080 if no PORT is set
+        port = "10000"  // Default Render port
     }
 
     fmt.Println("Using port:", port)
-    if err := r.Run(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
+    if err := r.Run("0.0.0.0:" + port); err != nil {
+        log.Fatal("Failed to start server:", err)
+    }
 }
