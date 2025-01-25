@@ -74,7 +74,7 @@ func main() {
         port = "8080" // Default to 8080 if no PORT is set
     }
 
-    log.Printf("Starting server on port %s...", port)
+    fmt.Println("Using port:", port)
     if err := r.Run("0.0.0.0:" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
