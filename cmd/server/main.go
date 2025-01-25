@@ -68,14 +68,14 @@ func main() {
 	r.PATCH("/comments/:id", func(c *gin.Context) { handlers.UpdateComment(c, db) })
 	r.PATCH("/threads/:id", func(c *gin.Context) { handlers.UpdateThread(c, db) })
 
-	// Bind to the port specified by the PORT environment variable
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "8080" // Default to 8080 if no PORT is set
-    }
+	// // Bind to the port specified by the PORT environment variable
+    // port := os.Getenv("PORT")
+    // if port == "" {
+    //     port = "8080" // Default to 8080 if no PORT is set
+    // }
 
-    fmt.Println("Using port:", port)
-    if err := r.Run("0.0.0.0:" + port); err != nil {
+    //fmt.Println("Using port:", port)
+    if err := r.Run("0.0.0.0:8080"); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
