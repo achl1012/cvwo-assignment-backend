@@ -13,6 +13,9 @@ import (
 )
 
 func main() {
+	// Set Gin to Release Mode
+    gin.SetMode(gin.ReleaseMode)
+	
 	// Get the working directory
 	wd, err := os.Getwd()
 	if err != nil {
