@@ -10,6 +10,7 @@ import (
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/gin-contrib/cors"
 	"github.com/CVWO/sample-go-app/internal/handlers"
+	"github.com/CVWO/sample-go-app/internal/database"
 )
 
 func main() {
@@ -25,14 +26,22 @@ func main() {
 	fmt.Println("Working directory:", wd)
 
 	// Open the SQLite database file
-	db, err := sql.Open("sqlite", wd+"/internal/database/database.db")
+    dbPath := wd + "/internal/database/database.db"
+    // Check if the file exists
+    if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+        fmt.Println("Database file does not exist. Creating new database...")
+        err = database.InitializeDatabase(dbPath)
+        if err != nil {
+            log.Fatalf("Failed to initialize database: %v", err)
+        }
+    }
 
-	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(db)
+    fmt.Println("Using database path:", dbPath)
+    db, err := sql.Open("sqlite", dbPath)
+    if err != nil {
+        log.Fatalf("Failed to open database: %v", err)
+    }
+    defer db.Close()
 
 	// Create the Gin router
 	r := gin.Default()
@@ -43,7 +52,10 @@ func main() {
 
    	// Enable CORS with custom configuration
     r.Use(cors.New(cors.Config{
-        AllowOrigins:     []string{"https://forumflow-frontend.onrender.com"}, // Frontend domain
+        AllowOrigins:     []string{
+			"https://forumflow-frontend.onrender.com",
+			"http://localhost:10001",
+		},
         AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
         AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
         ExposeHeaders:    []string{"Content-Length"},
