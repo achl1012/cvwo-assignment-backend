@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/glebarez/go-sqlite"
+	_ "github.com/lib/pq"
 )
 
 type Thread struct {
@@ -35,15 +36,9 @@ func CreateThread(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	// Insert thread into database
-	result, err := db.Exec("INSERT INTO threads (name, user_id) VALUES (?,?)", thread.Name, thread.UserID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Get ID of newly inserted thread
-	threadID, err := result.LastInsertId()
+	// Insert thread into database with RETURNING id
+	var threadID int
+	err := db.QueryRow("INSERT INTO threads (name, user_id) VALUES ($1, $2) RETURNING id", thread.Name, thread.UserID).Scan(&threadID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,7 +56,7 @@ func CreateThread(c *gin.Context, db *sql.DB) {
 
 			// Get the tag ID from the database
 			var tagID int
-			err := db.QueryRow("SELECT id FROM tags WHERE name = ?", tag).Scan(&tagID)
+			err := db.QueryRow("SELECT id FROM tags WHERE name = $1", tag).Scan(&tagID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Tag not found: " + tag})
 				return
@@ -69,7 +64,7 @@ func CreateThread(c *gin.Context, db *sql.DB) {
 
 			// Associate the tag with the thread in the thread_tags table
 			log.Printf("Associating thread ID %d with tag ID %d", threadID, tagID)
-			_, err = db.Exec("INSERT INTO thread_tags (thread_id, tag_id) VALUES (?, ?)", threadID, tagID)
+			_, err = db.Exec("INSERT INTO thread_tags (thread_id, tag_id) VALUES ($1, $2)", threadID, tagID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -93,7 +88,7 @@ func CreateThread(c *gin.Context, db *sql.DB) {
 func ListThreads(c *gin.Context, db *sql.DB) {
 	// Query to get threads along with their associated tags
 	query := `
-	SELECT threads.id, threads.name, threads.user_id, GROUP_CONCAT(tags.name) AS tags
+	SELECT threads.id, threads.name, threads.user_id, string_agg(tags.name, ', ') AS tags
 	FROM threads
 	LEFT JOIN thread_tags ON threads.id = thread_tags.thread_id
 	LEFT JOIN tags ON thread_tags.tag_id = tags.id
@@ -149,14 +144,14 @@ func DeleteThread(c *gin.Context, db *sql.DB) {
 	}
 
 	// Execute SQL to delete comments associated with the thread
-	_, err = db.Exec("DELETE FROM comments WHERE thread_id = ?", threadID)
+	_, err = db.Exec("DELETE FROM comments WHERE thread_id = $1", threadID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete associated comments"})
 		return
 	}
 
 	// Execute SQL to delete the thread
-	result, err := db.Exec("DELETE FROM threads WHERE id = ?", threadID)
+	result, err := db.Exec("DELETE FROM threads WHERE id = $1", threadID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete thread"})
 		return
@@ -222,7 +217,7 @@ func UpdateThread(c *gin.Context, db *sql.DB) {
     }
 
     // Execute SQL to update the thread name
-    result, err := db.Exec("UPDATE threads SET name = ? WHERE id = ?", input.Name, threadID)
+    result, err := db.Exec("UPDATE threads SET name = $1 WHERE id = $2", input.Name, threadID)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thread name"})
         return
@@ -242,7 +237,7 @@ func UpdateThread(c *gin.Context, db *sql.DB) {
     }
 
 	// Delete existing tags for the thread
-    _, err = tx.Exec("DELETE FROM thread_tags WHERE thread_id = ?", threadID)
+    _, err = tx.Exec("DELETE FROM thread_tags WHERE thread_id = $1", threadID)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear existing tags"})
         return
@@ -261,13 +256,13 @@ func UpdateThread(c *gin.Context, db *sql.DB) {
 		// Insert new tags
         for _, tag := range input.Tags {
             var tagID int
-            err := tx.QueryRow("SELECT id FROM tags WHERE name = ?", tag).Scan(&tagID)
+            err := tx.QueryRow("SELECT id FROM tags WHERE name = $1", tag).Scan(&tagID)
             if err != nil {
                 c.JSON(http.StatusInternalServerError, gin.H{"error": "Tag not found in database: " + tag})
                 return
             }
 
-            _, err = tx.Exec("INSERT INTO thread_tags (thread_id, tag_id) VALUES (?, ?)", threadID, tagID)
+            _, err = tx.Exec("INSERT INTO thread_tags (thread_id, tag_id) VALUES ($1, $2)", threadID, tagID)
             if err != nil {
                 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update tags"})
                 return
@@ -323,12 +318,14 @@ func GetThreadsByTags(c *gin.Context, db *sql.DB) {
 
     // Split the tags into a slice
     tags := strings.Split(tagsParam, ",")
-	placeholders := strings.Repeat("?,", len(tags))
-    placeholders = placeholders[:len(placeholders)-1] // Remove trailing comma
+    placeholders := make([]string, len(tags))
+    for i := range tags {
+        placeholders[i] = "$" + strconv.Itoa(i+1)
+    }
 
     // Create a query to get threads filtered by tags
     query := `
-    SELECT threads.id, threads.name, threads.user_id, GROUP_CONCAT(tags.name) AS tags
+    SELECT threads.id, threads.name, threads.user_id, string_agg(tags.name, ', ') AS tags
     FROM threads
     LEFT JOIN thread_tags ON threads.id = thread_tags.thread_id
     LEFT JOIN tags ON thread_tags.tag_id = tags.id
@@ -336,9 +333,9 @@ func GetThreadsByTags(c *gin.Context, db *sql.DB) {
         SELECT thread_tags.thread_id
         FROM thread_tags
         LEFT JOIN tags ON thread_tags.tag_id = tags.id
-        WHERE tags.name IN (` + placeholders + `)
+        WHERE tags.name IN (` + strings.Join(placeholders, ", ") + `)
         GROUP BY thread_tags.thread_id
-        HAVING COUNT(DISTINCT tags.name) = ?
+        HAVING COUNT(DISTINCT tags.name) = $` + strconv.Itoa(len(tags)+1) + `
     )
     GROUP BY threads.id
     `

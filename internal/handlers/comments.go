@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/glebarez/go-sqlite"
+	_ "github.com/lib/pq"
 )
 
 type Comment struct {
@@ -30,29 +31,39 @@ func CreateComment(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	// Insert comment into database
-	result, err := db.Exec("INSERT INTO comments (thread_id, user_id, text) VALUES (?, ?, ?)", comment.ThreadID, comment.UserID, comment.Text)
+	// Insert comment into database with RETURNING to get the id and created_at
+	var id int
+	var createdAt time.Time
+	err := db.QueryRow("INSERT INTO comments (thread_id, user_id, text) VALUES ($1, $2, $3) RETURNING id, created_at", comment.ThreadID, comment.UserID, comment.Text).Scan(&id, &createdAt)
 	if err != nil {
 		log.Printf("Error inserting comment: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Get ID of newly inserted comment
-	id, err := result.LastInsertId()
-	if err != nil {
-		log.Printf("Error inserting comment: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// // Insert comment into database
+	// result, err := db.Exec("INSERT INTO comments (thread_id, user_id, text) VALUES ($1, $2, $3)", comment.ThreadID, comment.UserID, comment.Text)
+	// if err != nil {
+	// 	log.Printf("Error inserting comment: %v", err)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// 	return
+	// }
 
-	// Fetch the created_at timestamp
-    var createdAt time.Time
-    err = db.QueryRow("SELECT created_at FROM comments WHERE id = ?", id).Scan(&createdAt)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch created_at"})
-        return
-    }
+	// // Get ID of newly inserted comment
+	// id, err := result.LastInsertId()
+	// if err != nil {
+	// 	log.Printf("Error inserting comment: %v", err)
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// 	return
+	// }
+
+	// // Fetch the created_at timestamp
+    // var createdAt time.Time
+    // err = db.QueryRow("SELECT created_at FROM comments WHERE id = $1", id).Scan(&createdAt)
+    // if err != nil {
+    //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch created_at"})
+    //     return
+    // }
 
 	// Return the inserted comment
     c.JSON(http.StatusOK, gin.H{
@@ -88,7 +99,7 @@ func ListComments(c *gin.Context, db *sql.DB) {
 	}
 
 	// Query database for comment
-	rows, err := db.Query("SELECT m.id, thread_id, user_id, u.username AS user_name, m.text, m.created_at FROM comments m LEFT JOIN users u ON u.id = m.user_id WHERE thread_id = ? AND m.id > ? ORDER BY m.id ASC LIMIT ?", threadID, lastCommentID, limit)
+	rows, err := db.Query("SELECT m.id, thread_id, user_id, u.username AS user_name, m.text, m.created_at FROM comments m LEFT JOIN users u ON u.id = m.user_id WHERE thread_id = $1 AND m.id > $2 ORDER BY m.id ASC LIMIT $3", threadID, lastCommentID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -127,7 +138,7 @@ func DeleteComment(c *gin.Context, db *sql.DB) {
 	}
 
 	// Execute SQL to delete the comment
-	result, err := db.Exec("DELETE FROM comments WHERE id = ?", commentID)
+	result, err := db.Exec("DELETE FROM comments WHERE id = $1", commentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment"})
 		return
@@ -175,7 +186,7 @@ func UpdateComment(c *gin.Context, db *sql.DB) {
     }
 
     // Execute SQL to update the comment
-    result, err := db.Exec("UPDATE comments SET text = ? WHERE id = ?", input.Text, commentID)
+    result, err := db.Exec("UPDATE comments SET text = $1 WHERE id = $2", input.Text, commentID)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update comment"})
         return

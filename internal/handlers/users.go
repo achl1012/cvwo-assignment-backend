@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/glebarez/go-sqlite"
+	_ "github.com/lib/pq"
 )
 
 type User struct {
@@ -22,19 +23,26 @@ func CreateUser(c *gin.Context, db *sql.DB) {
 		return
 	}
 
-	// Insert user into database
-	result, err := db.Exec("INSERT INTO users (username) VALUES (?)", user.Username)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	// Check if the username already exists
+    var count int
+    err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = $1", user.Username).Scan(&count)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check username availability"})
+        return
+    }
 
-	// Get ID of newly inserted user
-	id, err := result.LastInsertId()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+    if count > 0 {
+        c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
+        return
+    }
+
+	// Insert user into database and return the inserted ID
+    var id int
+    err = db.QueryRow("INSERT INTO users (username) VALUES ($1) RETURNING id", user.Username).Scan(&id)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
 
 	// Return ID of newly inserted user
 	c.JSON(http.StatusOK, gin.H{"id": id})
@@ -50,7 +58,7 @@ func Login(c *gin.Context, db *sql.DB) {
 	}
 
 	// Query database for user
-	row := db.QueryRow("SELECT id FROM users WHERE username = ?", user.Username)
+	row := db.QueryRow("SELECT id FROM users WHERE username = $1", user.Username)
 
 	// Get ID of user
 	var id int
@@ -58,7 +66,7 @@ func Login(c *gin.Context, db *sql.DB) {
 	if err != nil {
 		// Check if user was not found
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid username"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username"})
 			return
 		}
 		// Return error if other error occurred

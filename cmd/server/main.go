@@ -7,13 +7,21 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/gin-contrib/cors"
+	"github.com/joho/godotenv"
 	"github.com/CVWO/sample-go-app/internal/handlers"
 	"github.com/CVWO/sample-go-app/internal/database"
 )
 
 func main() {
+	// Load environment variables from .env file
+    err := godotenv.Load()
+    if err != nil {
+        log.Fatal("Error loading .env file")
+    }
+	
 	// Set Gin to Release Mode
     gin.SetMode(gin.ReleaseMode)
 
@@ -25,23 +33,42 @@ func main() {
 	// Print the working directory
 	fmt.Println("Working directory:", wd)
 
-	// Open the SQLite database file
-    dbPath := wd + "/internal/database/database.db"
-    // Check if the file exists
-    if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-        fmt.Println("Database file does not exist. Creating new database...")
-        err = database.InitializeDatabase(dbPath)
-        if err != nil {
-            log.Fatalf("Failed to initialize database: %v", err)
-        }
+	// PostgreSQL connection URL from environment variable (set on Render)
+    dbURL := os.Getenv("DATABASE_URL")
+    if dbURL == "" {
+        log.Fatal("DATABASE_URL is not set")
     }
 
-    fmt.Println("Using database path:", dbPath)
-    db, err := sql.Open("sqlite", dbPath)
+    // Open the PostgreSQL database connection
+    db, err := sql.Open("postgres", dbURL)
     if err != nil {
         log.Fatalf("Failed to open database: %v", err)
     }
     defer db.Close()
+
+    // Initialize the database if not already set up
+    err = database.InitializeDatabase(db)
+    if err != nil {
+        log.Fatalf("Failed to initialize database: %v", err)
+    }
+
+	// // Open the SQLite database file
+    // dbPath := wd + "/internal/database/database.db"
+    // // Check if the file exists
+    // if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+    //     fmt.Println("Database file does not exist. Creating new database...")
+    //     err = database.InitializeDatabase(dbPath)
+    //     if err != nil {
+    //         log.Fatalf("Failed to initialize database: %v", err)
+    //     }
+    // }
+
+    // fmt.Println("Using database path:", dbPath)
+    // db, err := sql.Open("sqlite", dbPath)
+    // if err != nil {
+    //     log.Fatalf("Failed to open database: %v", err)
+    // }
+    // defer db.Close()
 
 	// Create the Gin router
 	r := gin.Default()

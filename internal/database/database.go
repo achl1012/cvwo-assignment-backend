@@ -6,38 +6,32 @@ import (
 )
 
 // Create the database file and initialize the necessary tables and seed data
-func InitializeDatabase(dbPath string) error {
-    db, err := sql.Open("sqlite", dbPath)
-    if err != nil {
-        return fmt.Errorf("failed to open database: %v", err)
-    }
-    defer db.Close()
-
+func InitializeDatabase(db *sql.DB) error {
     // Create tables
     tableSQL := `
     CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         username TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS threads (
-        id INTEGER PRIMARY KEY,
+        id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        user_id INT DEFAULT 0 NOT NULL
+        user_id INT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS comments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        thread_id INTEGER NOT NULL,
-        user_id INTEGER NOT NULL,
+        id SERIAL PRIMARY KEY,
+        thread_id INT NOT NULL,
+        user_id INT NOT NULL,
         text TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (thread_id) REFERENCES threads(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
     CREATE TABLE IF NOT EXISTS tags (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         name TEXT UNIQUE NOT NULL
     );
 
@@ -47,18 +41,20 @@ func InitializeDatabase(dbPath string) error {
         PRIMARY KEY (thread_id, tag_id)
     );
     `
-    _, err = db.Exec(tableSQL)
+
+    _, err := db.Exec(tableSQL)
     if err != nil {
         return fmt.Errorf("failed to create tables: %v", err)
     }
 
     // Seed tags
     seedTagsSQL := `
-    INSERT OR IGNORE INTO tags (name) VALUES
+    INSERT INTO tags (name) VALUES
     ('School'),
     ('Work'),
     ('Interests and Hobbies'),
-    ('Miscellaneous');
+    ('Miscellaneous')
+    ON CONFLICT (name) DO NOTHING;
     `
     _, err = db.Exec(seedTagsSQL)
     if err != nil {
