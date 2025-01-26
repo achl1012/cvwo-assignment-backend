@@ -15,7 +15,7 @@ import (
 func main() {
 	// Set Gin to Release Mode
     gin.SetMode(gin.ReleaseMode)
-	
+
 	// Get the working directory
 	wd, err := os.Getwd()
 	if err != nil {
@@ -41,8 +41,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Enable CORS
-    r.Use(cors.Default())
+   	// Enable CORS with custom configuration
+    r.Use(cors.New(cors.Config{
+        AllowOrigins:     []string{"https://forumflow-frontend.onrender.com"}, // Frontend domain
+        AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+        AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+        ExposeHeaders:    []string{"Content-Length"},
+        AllowCredentials: true,
+    }))
 
 	// Creation endpoints
 	r.POST("/users", func(c *gin.Context) { handlers.CreateUser(c, db) })
