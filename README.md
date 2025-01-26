@@ -1,10 +1,4 @@
-# CVWO Assignment Sample Golang App
-
-This sample Golang app is provided to help you experiment and practice web development fundamentals.
-It shows how certain functionality can be implemented.
-However, do note that this is **far from a model example**.
-After all, we want to see how you maximise your learning in web development
-and good software development practices.
+# CVWO Assignment Backend
 
 ## Getting Started
 
@@ -16,39 +10,60 @@ Download and install Go by following the instructions [here](https://go.dev/doc/
 1. [Fork](https://docs.github.com/en/get-started/quickstart/fork-a-repo#forking-a-repository) this repo.
 2. [Clone](https://docs.github.com/en/get-started/quickstart/fork-a-repo#cloning-your-forked-repository) **your** forked repo.
 3. Open your terminal and navigate to the directory containing your cloned project.
-4. Run `go run cmd/server/main.go` and head over to http://localhost:8000/users to view the response.
+4.  **Install dependencies**
 
+    You can install necessary Go packages via:
+     ```bash
+     go mod tidy
+     ```
 
-### Navigating the code
-This is the main file structure. Note that this is simply *one of* various paradigms to organise your code, and is just a bare starting point.
-```
-.
-├── cmd
-│   ├── server
-├── internal
-│   ├── api         # Encapsulates types and utilities related to the API
-│   ├── dataacess   # Data Access layer accesses data from the database
-│   ├── database    # Encapsulates the types and utilities related to the database
-│   ├── handlers    # Handler functions to respond to requests
-│   ├── models      # Definitions of objects used in the application
-│   ├── router      # Encapsulates types and utilities related to the router
-│   ├── routes      # Defines routes that are used in the application
-├── README.md
-├── go.mod
-└── go.sum
-```
+5. **Set Up PostgreSQL Locally**
 
-Main directories/files to note:
-* `cmd` contains the main entry point for the application
-* `internal` holds most of the functional code for your project that is specific to the core logic of your application
-* `README.md` is a form of documentation about the project. It is what you are reading right now.
-* `go.mod` contains important metadata, for example, the dependencies in the project. See [here](https://go.dev/ref/mod) for more information
-* `go.sum` See [here](https://go.dev/ref/mod) for more information
+   If you don't have PostgreSQL installed, download and install it from [here](https://www.postgresql.org/download/).
 
-Try changing some source code and see how the app changes.
+   After installing, you can create a local PostgreSQL database and user as follows:
 
-## Next Steps
+- **Start the PostgreSQL server**  
+   Run the following command to start the PostgreSQL server (adjust the command based on your OS and PostgreSQL installation):
 
-* This project uses [go-chi](https://github.com/go-chi/chi) as a web framework. Feel free to explore other web frameworks such as [gin-gonic](https://github.com/gin-gonic/gin). Compare their pros and cons and use whatever that best justifies the trade-offs.
-* Read up more on the [MVC framework](https://developer.mozilla.org/en-US/docs/Glossary/MVC) which this code is designed upon.
-* Sometimes, code formatting can get messy and opiniated. Do see how you can incoporate [linters](https://github.com/golangci/golangci-lint) to format your code.
+   ```bash
+   pg_ctl -D /usr/local/var/postgres start  # Example for macOS
+   ```
+
+- **Access the PostgreSQL command line**
+
+     Enter the following command:
+     ```bash
+     psql postgres
+     ```
+- **Create a new database and user**
+  
+     Run the following SQL commands to create a new database and user:
+     ```sql
+     CREATE DATABASE forumflow;
+     CREATE USER yourusername WITH PASSWORD 'yourpassword';
+     ALTER ROLE yourusername SET client_encoding TO 'utf8';
+     ALTER ROLE yourusername SET default_transaction_isolation TO 'read committed';
+     ALTER ROLE yourusername SET timezone TO 'UTC';
+     GRANT ALL PRIVILEGES ON DATABASE forumflow TO yourusername;
+     ```
+
+6. **Configure `.env` file**
+
+   Create a .env file in the root of the backend folder if it doesn't already exist.
+
+   Set the DATABASE_URL variable to your local database credentials:
+   ```.env
+   DATABASE_URL=postgres://yourusername:yourpassword@localhost:5432/forumflow?sslmode=disable
+   ```
+
+   Note: Replace yourusername and yourpassword with the credentials you used to set up the database. If you're using a different host or port, make sure to adjust the URL accordingly.
+   
+7. **Run the backend**
+   
+   Start the Go backend server:
+   ```bash
+   go run cmd/server/main.go
+   ```
+   
+   Your backend should now be running at http://localhost:10000
