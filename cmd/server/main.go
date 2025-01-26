@@ -16,12 +16,14 @@ import (
 )
 
 func main() {
-	// Load environment variables from .env file
-    err := godotenv.Load()
-    if err != nil {
-        log.Fatal("Error loading .env file")
-    }
-	
+	// Load the .env file only in local development
+	if os.Getenv("RENDER") == "" {
+		err := godotenv.Load()
+		if err != nil {
+			log.Println("Error loading .env file, proceeding without it")
+		}
+	}
+
 	// Set Gin to Release Mode
     gin.SetMode(gin.ReleaseMode)
 
@@ -33,6 +35,8 @@ func main() {
 	// Print the working directory
 	fmt.Println("Working directory:", wd)
 
+	log.Println("Database URL:", os.Getenv("DATABASE_URL"))
+	
 	// PostgreSQL connection URL from environment variable (set on Render)
     dbURL := os.Getenv("DATABASE_URL")
     if dbURL == "" {
